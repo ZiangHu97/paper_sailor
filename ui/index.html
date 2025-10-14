@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paper Sailor</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Paper Sailor</h1>
+      <p class="sub">Browse sessions, findings, and ideas</p>
+    </header>
+    <main>
+      <aside>
+        <div class="section">
+          <h2>Sessions</h2>
+          <ul id="sessions"></ul>
+        </div>
+        <div class="section">
+          <h2>Papers</h2>
+          <ul id="papers"></ul>
+        </div>
+      </aside>
+      <section id="content">
+        <div id="welcome">Select a session to view details.</div>
+        <div id="session" class="hidden">
+          <h2 id="topic"></h2>
+          <div id="warnings" class="hidden"></div>
+          <h3>Questions</h3>
+          <ul id="questions"></ul>
+          <h3>Findings</h3>
+          <div id="findings"></div>
+          <h3>Ideas</h3>
+          <div id="ideas"></div>
+          <h3>Reading List</h3>
+          <ul id="reading"></ul>
+        </div>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+  </html>

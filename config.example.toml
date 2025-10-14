@@ -1,0 +1,20 @@
+# Example configuration for Paper Sailor
+
+[openai]
+# API key for OpenAI-compatible endpoint (or third-party relay)
+api_key = "sk-your-key"
+
+# Base URL for API. For OpenAI official use "https://api.openai.com/v1".
+# For third-party relays include the version path if required, e.g., "https://your-relay.example.com/v1".
+base_url = "https://api.openai.com/v1"
+
+# Default embedding model used when building the vector index.
+embedding_model = "text-embedding-3-small"
+# Primary reasoning / planner model
+model = "gpt-4o-mini"
+
+# Optional request timeout in seconds
+timeout = 30
+
+# Optional extra headers (e.g., custom auth for relay)
+# extra_headers = { "X-Proxy-Auth" = "token" }
