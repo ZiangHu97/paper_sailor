@@ -9,6 +9,7 @@ __pycache__/
 venv/
 env/
 
+config.toml
 # Local data/cache outputs
 data/
 *.sqlite3
