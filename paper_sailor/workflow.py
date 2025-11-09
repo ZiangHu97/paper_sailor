@@ -25,8 +25,11 @@ from .tools import (
     parse_pdf_text,
     search_arxiv,
     vector_retrieve,
+    multimodal_retrieve,
+    extract_figures_and_tables,
 )
 from .vectorstore import VectorStore
+from .memory import MemoryManager
 
 
 DEFAULT_STATE: Dict[str, Any] = {
@@ -90,6 +93,14 @@ def _download_and_chunk(paper: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Li
             warnings.append(f"parse_failed:{paper_id}:{exc}")
             chunks = []
 
+    # Best-effort extraction of figures and tables
+    visual_items: List[Dict[str, Any]] = []
+    if pdf_local:
+        try:
+            visual_items = extract_figures_and_tables(pdf_path_str, paper_id)
+        except Exception as exc:
+            warnings.append(f"visual_extract_failed:{paper_id}:{exc}")
+
     if not chunks:
         summary = (paper.get("summary") or "").strip()
         if summary:
@@ -106,10 +117,12 @@ def _download_and_chunk(paper: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Li
         else:
             warnings.append(f"no_content:{paper_id}")
 
-    if chunks:
-        write_chunks(paper_id, chunks)
-
-    return chunks, warnings
+    combined: List[Dict[str, Any]] = list(chunks or [])
+    if visual_items:
+        combined.extend(visual_items)
+    if combined:
+        write_chunks(paper_id, combined)
+    return combined, warnings
 
 
 def _index_chunks(session_id: str, chunks: List[Dict[str, Any]], store: VectorStore) -> List[str]:
@@ -278,6 +291,14 @@ def _do_read(
         paper_meta["notes"] = action.get("notes", "")
         lines.append(f"{pid}: processed {len(chunks)} chunks")
 
+    # Update session memory with reading progress
+    try:
+        mm = MemoryManager()
+        processed_ids = [str(pid) for pid in paper_ids]
+        mm.add_session_context(session_id, {"papers_read": processed_ids})
+    except Exception:
+        pass
+
     summary = "\n".join(lines) if lines else "No papers processed."
     return summary, warnings
 
@@ -301,7 +322,9 @@ def _do_summarize(
             continue
         vector_hits = []
         try:
-            vector_hits = vector_retrieve(session_id, question_text, store, top_n=4)
+            mm = MemoryManager()
+            results = multimodal_retrieve(session_id, question_text, store, mm, top_n=4)
+            vector_hits = (results.get("text_chunks", []) or []) + (results.get("figures", []) or []) + (results.get("tables", []) or [])
         except Exception:
             vector_hits = []
         if not vector_hits:

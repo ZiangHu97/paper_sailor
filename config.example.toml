@@ -12,9 +12,19 @@ base_url = "https://api.openai.com/v1"
 embedding_model = "text-embedding-3-small"
 # Primary reasoning / planner model
 model = "gpt-4o-mini"
+# Vision model for multimodal (images/figures/tables) understanding
+vision_model = "gpt-4o"
+max_vision_tokens = 4096
 
 # Optional request timeout in seconds
 timeout = 30
 
 # Optional extra headers (e.g., custom auth for relay)
 # extra_headers = { "X-Proxy-Auth" = "token" }
+
+[mem0]
+# MEM0 Cloud configuration
+api_key = "m0-your-key"
+organization_id = "your-org-id"
+# Optional base URL override
+base_url = "https://api.mem0.ai/v1"

@@ -54,3 +54,26 @@ def embed_texts(texts: Iterable[str], model: str | None = None) -> List[List[flo
             embeddings.append([float(x) for x in emb])
     return embeddings
 
+
+def embed_multimodal(items: Iterable[dict], model: str | None = "text-embedding-3-large") -> List[List[float]]:
+    """Generate embeddings for multimodal items by embedding their textual descriptions.
+
+    Each item can be one of:
+      - {'type': 'text', 'content': '...'} or with 'text' key
+      - {'type': 'figure'|'table', 'content': '...'} or with 'text'/'visual_description'
+    """
+    texts: List[str] = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        text = (
+            it.get("content")
+            or it.get("text")
+            or it.get("visual_description")
+            or ""
+        )
+        text = str(text).strip()
+        if text:
+            texts.append(text)
+    return embed_texts(texts, model=model)
+

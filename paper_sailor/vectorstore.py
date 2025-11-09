@@ -35,6 +35,19 @@ class VectorStore:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_embeddings_session ON embeddings(session_id)"
             )
+            # Best-effort schema extension for multimodal support
+            try:
+                conn.execute("ALTER TABLE embeddings ADD COLUMN content_type TEXT DEFAULT 'text'")
+            except Exception:
+                pass
+            try:
+                conn.execute("ALTER TABLE embeddings ADD COLUMN visual_description TEXT")
+            except Exception:
+                pass
+            try:
+                conn.execute("ALTER TABLE embeddings ADD COLUMN image_path TEXT")
+            except Exception:
+                pass
 
     def upsert(self, session_id: str, records: Iterable[Dict]) -> None:
         rows = []
@@ -61,6 +74,35 @@ class VectorStore:
                 rows,
             )
 
+    def upsert_multimodal(self, session_id: str, records: Iterable[Dict]) -> None:
+        """Insert/update records with optional multimodal fields."""
+        rows = []
+        for rec in records:
+            emb = rec.get("embedding")
+            chunk_id = rec.get("chunk_id")
+            if not emb or not chunk_id:
+                continue
+            rows.append(
+                (
+                    session_id,
+                    chunk_id,
+                    rec.get("paper_id"),
+                    rec.get("text"),
+                    json.dumps(list(map(float, emb))),
+                    json.dumps(rec.get("metadata", {})),
+                    rec.get("content_type") or "text",
+                    rec.get("visual_description"),
+                    rec.get("image_path"),
+                )
+            )
+        if not rows:
+            return
+        with self._connect() as conn:
+            conn.executemany(
+                "REPLACE INTO embeddings (session_id, chunk_id, paper_id, text, embedding, metadata, content_type, visual_description, image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                rows,
+            )
+
     def delete_session(self, session_id: str) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM embeddings WHERE session_id = ?", (session_id,))
@@ -69,17 +111,30 @@ class VectorStore:
         if not embedding:
             return []
         with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT chunk_id, paper_id, text, embedding, metadata FROM embeddings WHERE session_id = ?",
-                (session_id,),
-            ).fetchall()
+            try:
+                rows = conn.execute(
+                    "SELECT chunk_id, paper_id, text, embedding, metadata, content_type, visual_description, image_path FROM embeddings WHERE session_id = ?",
+                    (session_id,),
+                ).fetchall()
+                has_extra = True
+            except Exception:
+                rows = conn.execute(
+                    "SELECT chunk_id, paper_id, text, embedding, metadata FROM embeddings WHERE session_id = ?",
+                    (session_id,),
+                ).fetchall()
+                has_extra = False
 
         query_norm = _vector_norm(embedding)
         if query_norm == 0:
             return []
 
         scored: List[Dict] = []
-        for chunk_id, paper_id, text, emb_json, meta_json in rows:
+        for row in rows:
+            if len(row) >= 8:
+                chunk_id, paper_id, text, emb_json, meta_json, content_type, visual_desc, image_path = row[:8]
+            else:
+                chunk_id, paper_id, text, emb_json, meta_json = row[:5]
+                content_type, visual_desc, image_path = "text", None, None
             try:
                 emb = json.loads(emb_json)
             except Exception:
@@ -91,13 +146,18 @@ class VectorStore:
                     metadata = json.loads(meta_json)
                 except Exception:
                     metadata = {}
-            scored.append({
-                "chunk_id": chunk_id,
-                "paper_id": paper_id,
-                "text": text,
-                "score": score,
-                "metadata": metadata,
-            })
+            scored.append(
+                {
+                    "chunk_id": chunk_id,
+                    "paper_id": paper_id,
+                    "text": text,
+                    "score": score,
+                    "metadata": metadata,
+                    "content_type": content_type,
+                    "visual_description": visual_desc,
+                    "image_path": image_path,
+                }
+            )
 
         scored.sort(key=lambda x: x["score"], reverse=True)
         return scored[:top_k]

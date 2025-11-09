@@ -27,6 +27,21 @@ class OpenAISettings:
 
 
 _OPENAI_CACHE: Optional[OpenAISettings] = None
+_MEM0_CACHE = None  # type: ignore[assignment]
+_VISION_CACHE = None  # type: ignore[assignment]
+
+
+@dataclass(frozen=True)
+class MEM0Settings:
+    api_key: Optional[str]
+    base_url: str
+    organization_id: Optional[str]
+
+
+@dataclass(frozen=True)
+class VisionSettings:
+    model: str
+    max_tokens: int
 
 
 def _load_local_config() -> Dict:
@@ -81,3 +96,46 @@ def get_openai_settings() -> OpenAISettings:
         extra_headers=extra_headers,
     )
     return _OPENAI_CACHE
+
+
+def get_mem0_settings() -> MEM0Settings:
+    global _MEM0_CACHE
+    if _MEM0_CACHE is not None:
+        return _MEM0_CACHE  # type: ignore[return-value]
+
+    data = _load_local_config()
+    section = data.get("mem0", {}) if isinstance(data, dict) else {}
+
+    api_key = os.getenv("MEM0_API_KEY") or section.get("api_key")
+    base_url = os.getenv("MEM0_BASE_URL") or section.get("base_url") or "https://api.mem0.ai/v1"
+    base_url = str(base_url).rstrip("/")
+    org_id = os.getenv("MEM0_ORG_ID") or section.get("organization_id")
+
+    _MEM0_CACHE = MEM0Settings(
+        api_key=str(api_key) if api_key else None,
+        base_url=base_url,
+        organization_id=str(org_id) if org_id else None,
+    )
+    return _MEM0_CACHE  # type: ignore[return-value]
+
+
+def get_vision_settings() -> VisionSettings:
+    global _VISION_CACHE
+    if _VISION_CACHE is not None:
+        return _VISION_CACHE  # type: ignore[return-value]
+
+    data = _load_local_config()
+    section = data.get("openai", {}) if isinstance(data, dict) else {}
+
+    model = os.getenv("OPENAI_VISION_MODEL") or section.get("vision_model") or "gpt-4o"
+    max_tokens_raw = os.getenv("OPENAI_VISION_MAX_TOKENS") or section.get("max_vision_tokens") or 4096
+    try:
+        max_tokens = int(max_tokens_raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        max_tokens = 4096
+
+    _VISION_CACHE = VisionSettings(
+        model=str(model),
+        max_tokens=max_tokens,
+    )
+    return _VISION_CACHE  # type: ignore[return-value]
